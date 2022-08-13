@@ -1,6 +1,6 @@
 import os
 import logging
-import churn_library as cls
+from src import churn_library as cls
 import pytest
 import os
 import tempfile
