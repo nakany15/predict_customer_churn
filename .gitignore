@@ -1,4 +1,4 @@
 /data/*.csv
-/src/__pycache__/**/*
-/__pycache__/**/*
-/test/__pycache/**/*
+/src/__pycache__/*
+/__pycache__/*
+/test/__pycache/*
