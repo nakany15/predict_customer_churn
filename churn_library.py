@@ -11,10 +11,12 @@ Models are created by following steps.
 
 # import libraries
 import os
+from typing import List, Dict, Any, Union
 from sklearn.metrics import plot_roc_curve, classification_report
 from sklearn.model_selection import GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
+from sklearn.base import ClassifierMixin
 from sklearn.model_selection import train_test_split
 import joblib
 import pandas as pd
@@ -22,13 +24,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import yaml
+
 sns.set()
 
 
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 
 
-def import_data(pth):
+def import_data(pth: str) -> pd.DataFrame:
     '''
     returns dataframe for the csv found at pth
 
@@ -44,11 +47,15 @@ def import_data(pth):
     return df_train
 
 
-def perform_eda(df_train, out_plot_path,):
+def perform_eda(
+    df_train: pd.DataFrame,
+    out_plot_dir: str,
+) -> None:
     '''
     perform eda on df and save figures to images folder
     input:
             df: pandas dataframe
+            out_plot_dir: directory path to output EDA plot images
 
     output:
             None
@@ -71,7 +78,7 @@ def perform_eda(df_train, out_plot_path,):
     # plot histograms for quantitative features
     for axis, col in zip(axes.flatten(), quant_columns):
         df_train[col].hist(ax=axis)
-    fig.savefig(os.path.join(out_plot_path, 'histograms.png'))
+    fig.savefig(os.path.join(out_plot_dir, 'histograms.png'))
 
     fig, axes = plt.subplots(
         len(cat_columns), 1, figsize=(
@@ -80,24 +87,30 @@ def perform_eda(df_train, out_plot_path,):
     # count plots for categorical features
     for axis, col in zip(axes.flatten(), cat_columns):
         df_train[col].value_counts('normalize').plot(kind='bar', ax=axis)
-    fig.savefig(os.path.join(out_plot_path, 'value_counts.png'))
+    fig.savefig(os.path.join(out_plot_dir, 'value_counts.png'))
 
     # plot heatmap that visualize correlation matrix
     fig = plt.figure(figsize=(20, 10))
     sns.heatmap(df_train.corr(), annot=False, cmap='Dark2_r', linewidths=2)
-    fig.savefig(os.path.join(out_plot_path, 'correlations.png'))
+    fig.savefig(os.path.join(out_plot_dir, 'correlations.png'))
 
 
-def encoder_helper(df_train, category_lst, response):
+def encoder_helper(
+    df_train: pd.DataFrame,
+    category_lst: List[str],
+    response: str
+) -> pd.DataFrame:
     '''
     helper function to turn each categorical column into a new column with
     propotion of churn for each category - associated with cell 15 from the notebook
 
     input:
             df: pandas dataframe
-            category_lst: list of columns that contain categorical features
-            response: string of response name [optional argument
-                      that could be used for naming variables or index y column
+            category_lst:
+                list of columns that contain categorical features
+            response:
+                string of response name [optional argument
+                that could be used for naming variables or index y column
 
     output:
             df: pandas dataframe with new columns for
@@ -124,16 +137,24 @@ def encoder_helper(df_train, category_lst, response):
     return df_train
 
 
-def perform_feature_engineering(df_train, 
-                                categories_to_encode, 
-                                other_cols_to_keep,
-                                response
-                                ):
+def perform_feature_engineering(
+    df_train: pd.DataFrame,
+    categories_to_encode: List[str],
+    other_cols_to_keep: List[str],
+    response: str
+) -> pd.DataFrame:
     '''
     input:
               df: pandas dataframe
-              response: string of response name [optional argument
-                        that could be used for naming variables or index y column
+              categories_to_encode:
+                    a list of feature names to perform target encoding.
+                    encoded features are automatically added to training data.
+              other_cols_to_keep:
+                    a list of feature names to use as training features.
+                    do not include features specified in categories_to_encode.
+              response:
+                    string of response name [optional argument
+                    that could be used for naming variables or index y column
 
     output:
               X_train: X training data
@@ -145,7 +166,8 @@ def perform_feature_engineering(df_train,
     # create target variable that takes 1 if customer churn occures
     # perform target encoding
     df_train = encoder_helper(df_train, categories_to_encode, response)
-    keep_cols = other_cols_to_keep + [f'{col}_Churn' for col in categories_to_encode]
+    keep_cols = other_cols_to_keep + \
+        [f'{col}_Churn' for col in categories_to_encode]
     y_train_test = df_train[response]
     x_train_test = df_train[keep_cols]
     x_train, x_test, y_train, y_test = train_test_split(
@@ -157,12 +179,13 @@ def perform_feature_engineering(df_train,
     return x_train, x_test, y_train, y_test
 
 
-def create_classification_report(y_train,
-                                    y_test,
-                                    y_train_preds,
-                                    y_test_preds,
-                                    classifier,
-                                    ):
+def create_classification_report(
+    y_train: Union[pd.Series, np.array],
+    y_test: Union[pd.Series, np.array],
+    y_train_preds: Union[pd.Series, np.array],
+    y_test_preds: Union[pd.Series, np.array],
+    classifier: str,
+) -> plt.figure:
     """
     create classification report for training and testing results
     input:
@@ -171,7 +194,7 @@ def create_classification_report(y_train,
             y_train_preds:  training predictions
             y_test_preds:   test predictions
             classifier:  classifier name used for prediction.
-                            This string value is used for titles of the report.
+                         This string value is used for titles of the report.
     output:
             pyplot.figure: classification report figure
     """
@@ -213,14 +236,16 @@ def create_classification_report(y_train,
     plt.axis('off')
     return fig
 
-def classification_report_image(y_train,
-                                y_test,
-                                y_train_preds_lr,
-                                y_train_preds_rf,
-                                y_test_preds_lr,
-                                y_test_preds_rf,
-                                out_dir,
-                                ):
+
+def classification_report_image(
+    y_train: Union[pd.Series, np.array],
+    y_test: Union[pd.Series, np.array],
+    y_train_preds_lr: Union[pd.Series, np.array],
+    y_train_preds_rf: Union[pd.Series, np.array],
+    y_test_preds_lr: Union[pd.Series, np.array],
+    y_test_preds_rf: Union[pd.Series, np.array],
+    out_dir: str,
+) -> None:
     '''
     produces classification report for training and testing results and stores report as image
     in images folder
@@ -231,6 +256,7 @@ def classification_report_image(y_train,
             y_train_preds_rf: training predictions from random forest
             y_test_preds_lr: test predictions from logistic regression
             y_test_preds_rf: test predictions from random forest
+            out_dir: output directory path to save classification report
 
     output:
              None
@@ -257,7 +283,10 @@ def classification_report_image(y_train,
     fig_rf.savefig(os.path.join(out_dir, 'classification_report_rf.png'))
 
 
-def feature_importance_plot(model, x_data, output_dir):
+def feature_importance_plot(
+        model: ClassifierMixin,
+        x_data: Union[pd.DataFrame, np.ndarray],
+        output_dir: str) -> None:
     '''
     creates and stores the feature importances in pth
     input:
@@ -282,14 +311,15 @@ def feature_importance_plot(model, x_data, output_dir):
     plt.savefig(os.path.join(output_dir, 'feature_importances_rf.png'))
 
 
-def train_models(x_train,
-                 x_test,
-                 y_train,
-                 y_test,
-                 param_grid,
-                 out_plot_dir,
-                 out_model_dir,
-                 ):
+def train_models(
+    x_train: pd.DataFrame,
+    x_test: pd.DataFrame,
+    y_train: Union[pd.Series, np.array],
+    y_test: Union[pd.Series, np.array],
+    param_grid: Dict[str, Any],
+    out_plot_dir: str,
+    out_model_dir: str,
+):
     '''
     train, store model results: images + scores, and store models
     input:
@@ -297,14 +327,23 @@ def train_models(x_train,
               X_test: X testing data
               y_train: y training data
               y_test: y testing data
+              param_grid:
+                    a dictionary that specify the combination of parametars
+                    to search optimal parameter set.
+              out_plot_dir:
+                    a directory path to save classification report,
+                    feature importance plot and ROC curve
+              out_pldel_dir:
+                    a directory path to save Logistic Regression model
+                    and Random Forest Classifier model.
     output:
               None
     '''
     lrc = LogisticRegression(solver='lbfgs', max_iter=3000)
 
     cv_rfc = GridSearchCV(
-        estimator = RandomForestClassifier(random_state=42),
-        param_grid = param_grid,
+        estimator=RandomForestClassifier(random_state=42),
+        param_grid=param_grid,
         cv=5
     )
 
@@ -365,7 +404,7 @@ if __name__ == '__main__':
     # load parameters from parameters.yml
     with open('./parameters.yml') as f:
         parameters = yaml.safe_load(f.read())
-    
+
     df = import_data('./data/bank_data.csv')
 
     perform_eda(
@@ -374,11 +413,7 @@ if __name__ == '__main__':
     )
 
     X_train_churn, X_test_churn, y_train_churn, y_test_churn = perform_feature_engineering(
-        df, 
-        parameters['categories_to_encode'],
-        parameters['other_cols_to_keep'],
-        'Churn'
-    )
+        df, parameters['categories_to_encode'], parameters['other_cols_to_keep'], 'Churn')
 
     train_models(
         X_train_churn,
