@@ -1,6 +1,7 @@
 import os
 import logging
 import churn_library as cls
+import pytest
 
 logging.basicConfig(
     filename='./logs/churn_library.log',
@@ -8,29 +9,48 @@ logging.basicConfig(
     filemode='w',
     format='%(name)s - %(levelname)s - %(message)s')
 
-def test_import(import_data):
+def df_plugin():
+	return None
+
+def pytest_configure():
+	pytest.df = df_plugin()
+
+
+@pytest.fixture(scope='module')
+def path():
+	return "./data/bank_data.csv"
+
+def test_import_data(path):
 	'''
 	test data import - this example is completed for you to assist with the other test functions
 	'''
 	try:
-		df = import_data("./data/bank_data.csv")
+		pytest.df = cls.import_data(path)
 		logging.info("Testing import_data: SUCCESS")
 	except FileNotFoundError as err:
 		logging.error("Testing import_eda: The file wasn't found")
 		raise err
-
 	try:
-		assert df.shape[0] > 0
-		assert df.shape[1] > 0
+		assert pytest.df.shape[0] > 0
+		assert pytest.df.shape[1] > 0
 	except AssertionError as err:
 		logging.error("Testing import_data: The file doesn't appear to have rows and columns")
 		raise err
 
 
-def test_eda(perform_eda):
+def test_eda():
 	'''
 	test perform eda function
 	'''
+	df = pytest.df
+	try:
+		assert 'Attrition_Flag' in df.columns
+		assert 'Unnamed: 0' in df.columns
+		assert 'CLIENTNUM' in df.columns
+	except AssertionError as err:
+		logging.error("test_eda columns check: the DataFrame doesn't contain a target variable")
+	cls.perform_eda(df)
+
 
 
 def test_encoder_helper(encoder_helper):
