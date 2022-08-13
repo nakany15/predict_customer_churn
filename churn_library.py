@@ -54,13 +54,11 @@ def perform_eda(df):
     '''
     # translate Attrition_Flag to binary feature that value takes 1 when customer churn occures.
     df['Churn'] = df['Attrition_Flag'].apply(lambda val: 0 if val == "Existing Customer" else 1)
-    df = df.drop(columns = 
-        [
-            'Unnamed: 0',
-            'CLIENTNUM',
-            'Attrition_Flag',
-        ]
-    )
+    if 'Unnamed: 0' in df.columns:
+        df = df.drop(columns =['Unnamed: 0'])
+    if 'CLIENTNUM' in df.columns:
+        df = df.drop(columns = ['CLIENTNUM'])
+    df = df.drop(columns = 'Attrition_Flag')
     quant_columns = list(df.select_dtypes(include = np.number).columns)
     cat_columns = list(df.select_dtypes(exclude = np.number).columns)
 
