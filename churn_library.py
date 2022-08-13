@@ -39,7 +39,10 @@ def import_data(pth):
     output:
             df: pandas dataframe
     '''	
-    return pd.read_csv(pth)
+    df  = pd.read_csv(pth)
+    df['Churn'] = df['Attrition_Flag'].apply(lambda val: 0 if val == "Existing Customer" else 1)
+    df.drop(columns = ['Attrition_Flag'])
+    return df
     
 
 
@@ -53,12 +56,10 @@ def perform_eda(df, histogram_path, value_count_path, correlation_path):
             None
     '''
     # translate Attrition_Flag to binary feature that value takes 1 when customer churn occures.
-    df['Churn'] = df['Attrition_Flag'].apply(lambda val: 0 if val == "Existing Customer" else 1)
     if 'Unnamed: 0' in df.columns:
         df = df.drop(columns =['Unnamed: 0'])
     if 'CLIENTNUM' in df.columns:
         df = df.drop(columns = ['CLIENTNUM'])
-    df = df.drop(columns = 'Attrition_Flag')
     quant_columns = list(df.select_dtypes(include = np.number).columns)
     cat_columns = list(df.select_dtypes(exclude = np.number).columns)
 
@@ -141,9 +142,8 @@ def perform_feature_engineering(df, response):
         'Card_Category'
     ]
     # create target variable that takes 1 if customer churn occures
-    df['Churn'] = df[response].apply(lambda val: 0 if val == "Existing Customer" else 1)
     # perform target encoding
-    df = encoder_helper(df, categorical_list, 'Churn')
+    df = encoder_helper(df, categorical_list, response)
     keep_cols = [
         'Customer_Age', 'Dependent_count', 'Months_on_book',
         'Total_Relationship_Count', 'Months_Inactive_12_mon',
@@ -153,7 +153,7 @@ def perform_feature_engineering(df, response):
         'Gender_Churn', 'Education_Level_Churn', 'Marital_Status_Churn', 
         'Income_Category_Churn', 'Card_Category_Churn'
     ]
-    y = df['Churn']
+    y = df[response]
     X = df[keep_cols]
     X_train, X_test, y_train, y_test = train_test_split(
         X, 
@@ -353,7 +353,7 @@ def train_models(X_train, X_test, y_train, y_test):
     plt.savefig('./images/roc_curve.png')
 
     # save models
-    joblib.dump(cv_rfc.best_estimator_,'./models/rfc_models.pkl')
+    joblib.dump(cv_rfc.best_estimator_,'./models/rfc_model.pkl')
     joblib.dump(lrc, './models/logistic_model.pkl')
 
 
@@ -363,11 +363,11 @@ if __name__ == '__main__':
         df,
         './images/histograms.png',
         './images/value_counts.png',
-        './images/correlation.png'
+        './images/correlations.png'
     )
     X_train, X_test, y_train, y_test = perform_feature_engineering(
         df,
-        'Attrition_Flag'
+        'Churn'
     )
     train_models(X_train, X_test, y_train, y_test)
 
