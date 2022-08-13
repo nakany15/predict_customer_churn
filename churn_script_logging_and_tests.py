@@ -2,6 +2,7 @@ import os
 import logging
 import churn_library as cls
 import pytest
+import os
 
 logging.basicConfig(
     filename='./logs/churn_library.log',
@@ -38,22 +39,35 @@ def test_import_data(path):
 		raise err
 
 
-def test_eda():
+def test_eda(tmpdir):
 	'''
 	test perform eda function
 	'''
 	df = pytest.df
 	try:
 		assert 'Attrition_Flag' in df.columns
-		assert 'Unnamed: 0' in df.columns
-		assert 'CLIENTNUM' in df.columns
 	except AssertionError as err:
 		logging.error("test_eda columns check: the DataFrame doesn't contain a target variable")
-	cls.perform_eda(df)
+		raise err
+	histograms_path   = tmpdir.join('histograms.png')
+	value_counts_path = tmpdir.join('value_counts.png')
+	correlation_path  = tmpdir.join('correlations.png')
 
+	cls.perform_eda(
+		df,
+		histograms_path,
+		value_counts_path,
+		correlation_path
+	)
+	try:
+		assert os.path.isfile(histograms_path)
+		assert os.path.isfile(value_counts_path)
+		assert os.path.isfile(correlation_path)
+	except AssertionError as err:
+		logging.error("perform_eda function doesn't produce expected image outputs")
+		raise err
 
-
-def test_encoder_helper(encoder_helper):
+def test_encoder_helper():
 	'''
 	test encoder helper
 	'''

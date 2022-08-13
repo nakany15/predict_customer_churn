@@ -43,7 +43,7 @@ def import_data(pth):
     
 
 
-def perform_eda(df):
+def perform_eda(df, histogram_path, value_count_path, correlation_path):
     '''
     perform eda on df and save figures to images folder
     input:
@@ -71,19 +71,19 @@ def perform_eda(df):
     # plot histograms for quantitative features
     for i, (axis,col) in enumerate(zip(axes.flatten(),quant_columns)):
         df[col].hist(ax = axis)
-    fig.savefig('./images/histgrams.png')
+    fig.savefig(histogram_path)
 
     fig, axes = plt.subplots(len(cat_columns), 1,figsize = (20,10*len(cat_columns)))
 
     # count plots for categorical features
     for i, (axis,col) in enumerate(zip(axes.flatten(),cat_columns)):
         df[col].value_counts('normalize').plot(kind = 'bar', ax = axis)
-    fig.savefig('./images/value_counts.png')
+    fig.savefig(value_count_path)
 
     # plot heatmap that visualize correlation matrix
     fig = plt.figure(figsize=(20,10))
     sns.heatmap(df.corr(), annot=False, cmap='Dark2_r', linewidths = 2)
-    fig.savefig('./images/correlations.png')
+    fig.savefig(correlation_path)
 
 def encoder_helper(df, category_lst, response):
     '''
@@ -359,7 +359,12 @@ def train_models(X_train, X_test, y_train, y_test):
 
 if __name__ == '__main__':
     df = import_data('./data/bank_data.csv')
-    perform_eda(df)
+    perform_eda(
+        df,
+        './images/histograms.png',
+        './images/value_counts.png',
+        './images/correlation.png'
+    )
     X_train, X_test, y_train, y_test = perform_feature_engineering(
         df,
         'Attrition_Flag'
