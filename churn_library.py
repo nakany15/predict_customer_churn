@@ -16,8 +16,6 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import normalize
-import shap
 import joblib
 import pandas as pd
 import numpy as np
@@ -38,14 +36,14 @@ def import_data(pth):
     output:
             df: pandas dataframe
     '''
-    df = pd.read_csv(pth)
-    df['Churn'] = df['Attrition_Flag'].apply(
+    df_train = pd.read_csv(pth)
+    df_train['Churn'] = df_train['Attrition_Flag'].apply(
         lambda val: 0 if val == "Existing Customer" else 1)
-    df.drop(columns=['Attrition_Flag'])
-    return df
+    df_train.drop(columns=['Attrition_Flag'])
+    return df_train
 
 
-def perform_eda(df, histogram_path, value_count_path, correlation_path):
+def perform_eda(df_train, out_plot_path,):
     '''
     perform eda on df and save figures to images folder
     input:
@@ -56,12 +54,12 @@ def perform_eda(df, histogram_path, value_count_path, correlation_path):
     '''
     # translate Attrition_Flag to binary feature that value takes 1 when
     # customer churn occures.
-    if 'Unnamed: 0' in df.columns:
-        df = df.drop(columns=['Unnamed: 0'])
-    if 'CLIENTNUM' in df.columns:
-        df = df.drop(columns=['CLIENTNUM'])
-    quant_columns = list(df.select_dtypes(include=np.number).columns)
-    cat_columns = list(df.select_dtypes(exclude=np.number).columns)
+    if 'Unnamed: 0' in df_train.columns:
+        df_train = df_train.drop(columns=['Unnamed: 0'])
+    if 'CLIENTNUM' in df_train.columns:
+        df_train = df_train.drop(columns=['CLIENTNUM'])
+    quant_columns = list(df_train.select_dtypes(include=np.number).columns)
+    cat_columns = list(df_train.select_dtypes(exclude=np.number).columns)
 
     fig, axes = plt.subplots(
         len(quant_columns),
@@ -70,26 +68,26 @@ def perform_eda(df, histogram_path, value_count_path, correlation_path):
     )
 
     # plot histograms for quantitative features
-    for i, (axis, col) in enumerate(zip(axes.flatten(), quant_columns)):
-        df[col].hist(ax=axis)
-    fig.savefig(histogram_path)
+    for axis, col in zip(axes.flatten(), quant_columns):
+        df_train[col].hist(ax=axis)
+    fig.savefig(os.path.join(out_plot_path, 'histograms.png'))
 
     fig, axes = plt.subplots(
         len(cat_columns), 1, figsize=(
             20, 10 * len(cat_columns)))
 
     # count plots for categorical features
-    for i, (axis, col) in enumerate(zip(axes.flatten(), cat_columns)):
-        df[col].value_counts('normalize').plot(kind='bar', ax=axis)
-    fig.savefig(value_count_path)
+    for axis, col in zip(axes.flatten(), cat_columns):
+        df_train[col].value_counts('normalize').plot(kind='bar', ax=axis)
+    fig.savefig(os.path.join(out_plot_path, 'value_counts.png'))
 
     # plot heatmap that visualize correlation matrix
     fig = plt.figure(figsize=(20, 10))
-    sns.heatmap(df.corr(), annot=False, cmap='Dark2_r', linewidths=2)
-    fig.savefig(correlation_path)
+    sns.heatmap(df_train.corr(), annot=False, cmap='Dark2_r', linewidths=2)
+    fig.savefig(os.path.join(out_plot_path, 'correlations.png'))
 
 
-def encoder_helper(df, category_lst, response):
+def encoder_helper(df_train, category_lst, response):
     '''
     helper function to turn each categorical column into a new column with
     propotion of churn for each category - associated with cell 15 from the notebook
@@ -97,7 +95,8 @@ def encoder_helper(df, category_lst, response):
     input:
             df: pandas dataframe
             category_lst: list of columns that contain categorical features
-            response: string of response name [optional argument that could be used for naming variables or index y column]
+            response: string of response name [optional argument
+                      that could be used for naming variables or index y column
 
     output:
             df: pandas dataframe with new columns for
@@ -106,11 +105,11 @@ def encoder_helper(df, category_lst, response):
     # target encoding for categorical features
     for col in category_lst:
         churn_means = (
-            df.groupby(col)[response]
+            df_train.groupby(col)[response]
             .mean()
             .to_dict()
         )
-        mean_values = df[col].map(churn_means)
+        mean_values = df_train[col].map(churn_means)
         mean_df = (pd.concat(
             [mean_df, mean_values],
             axis=1
@@ -120,15 +119,16 @@ def encoder_helper(df, category_lst, response):
                     }
                     )
         )
-    df = pd.concat([df, mean_df], axis=1)
-    return df
+    df_train = pd.concat([df_train, mean_df], axis=1)
+    return df_train
 
 
-def perform_feature_engineering(df, response):
+def perform_feature_engineering(df_train, response):
     '''
     input:
               df: pandas dataframe
-              response: string of response name [optional argument that could be used for naming variables or index y column]
+              response: string of response name [optional argument
+                        that could be used for naming variables or index y column
 
     output:
               X_train: X training data
@@ -145,7 +145,7 @@ def perform_feature_engineering(df, response):
     ]
     # create target variable that takes 1 if customer churn occures
     # perform target encoding
-    df = encoder_helper(df, categorical_list, response)
+    df_train = encoder_helper(df_train, categorical_list, response)
     keep_cols = [
         'Customer_Age', 'Dependent_count', 'Months_on_book',
         'Total_Relationship_Count', 'Months_Inactive_12_mon',
@@ -155,16 +155,72 @@ def perform_feature_engineering(df, response):
         'Gender_Churn', 'Education_Level_Churn', 'Marital_Status_Churn',
         'Income_Category_Churn', 'Card_Category_Churn'
     ]
-    y = df[response]
-    X = df[keep_cols]
-    X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y,
+    y_train_test = df_train[response]
+    x_train_test = df_train[keep_cols]
+    x_train, x_test, y_train, y_test = train_test_split(
+        x_train_test,
+        y_train_test,
         test_size=0.3,
         random_state=42
     )
-    return X_train, X_test, y_train, y_test
+    return x_train, x_test, y_train, y_test
 
+
+def create_classification_report(y_train,
+                                    y_test,
+                                    y_train_preds,
+                                    y_test_preds,
+                                    classifier,
+                                    ):
+    """
+    create classification report for training and testing results
+    input:
+            y_train: training response values
+            y_test:  test response values
+            y_train_preds:  training predictions
+            y_test_preds:   test predictions
+            classifier:  classifier name used for prediction.
+                            This string value is used for titles of the report.
+    output:
+            pyplot.figure: classification report figure
+    """
+    fig = plt.figure(figsize=(10, 5))
+    # plt.text(0.01, 0.05, str(model.summary()), {'fontsize': 12}) old
+    # approach
+    plt.text(
+        0.01,
+        1.25,
+        str(f'{classifier} Train'),
+        {'fontsize': 10},
+        fontproperties='monospace'
+    )
+
+    plt.text(
+        0.01,
+        0.05,
+        str(classification_report(y_test, y_test_preds)),
+        {'fontsize': 10},
+        fontproperties='monospace'
+    )  # approach improved by OP -> monospace!
+
+    plt.text(
+        0.01,
+        0.6,
+        str(f'{classifier} Test'),
+        {'fontsize': 10},
+        fontproperties='monospace'
+    )
+
+    plt.text(
+        0.01,
+        0.7,
+        str(classification_report(y_train, y_train_preds)),
+        {'fontsize': 10},
+        fontproperties='monospace'
+    )  # approach improved by OP -> monospace!
+
+    plt.axis('off')
+    return fig
 
 def classification_report_image(y_train,
                                 y_test,
@@ -172,8 +228,7 @@ def classification_report_image(y_train,
                                 y_train_preds_rf,
                                 y_test_preds_lr,
                                 y_test_preds_rf,
-                                out_path_lr,
-                                out_path_rf,
+                                out_dir,
                                 ):
     '''
     produces classification report for training and testing results and stores report as image
@@ -189,71 +244,6 @@ def classification_report_image(y_train,
     output:
              None
     '''
-    def create_classification_report(y_train,
-                                     y_test,
-                                     y_train_preds,
-                                     y_test_preds,
-                                     classifier,
-                                     ):
-        """
-        create classification report for training and testing results
-        input:
-                y_train: training response values
-                y_test:  test response values
-                y_train_preds:  training predictions
-                y_test_preds:   test predictions
-                classifier:  classifier name used for prediction.
-                             This string value is used for titles of the report.
-        output:
-                pyplot.figure: classification report figure
-        """
-        fig = plt.figure(figsize=(10, 5))
-        # plt.text(0.01, 0.05, str(model.summary()), {'fontsize': 12}) old
-        # approach
-        plt.text(
-            0.01,
-            1.25,
-            str(f'{classifier} Train'),
-            {'fontsize': 10},
-            fontproperties='monospace'
-        )
-
-        plt.text(
-            0.01,
-            0.05,
-            str(classification_report(y_test, y_test_preds)),
-            {'fontsize': 10},
-            fontproperties='monospace'
-        )  # approach improved by OP -> monospace!
-
-        plt.text(
-            0.01,
-            0.6,
-            str(f'{classifier} Test'),
-            {'fontsize': 10},
-            fontproperties='monospace'
-        )
-
-        plt.text(
-            0.01,
-            0.7,
-            str(classification_report(y_train, y_train_preds)),
-            {'fontsize': 10},
-            fontproperties='monospace'
-        )  # approach improved by OP -> monospace!
-
-        plt.axis('off')
-        return fig
-
-    # create classification report for Random Forest
-    fig_rf = create_classification_report(
-        y_train,
-        y_test,
-        y_train_preds_rf,
-        y_test_preds_rf,
-        'Random Forest'
-    )
-    fig_rf.savefig(out_path_rf)
 
     # create classification report for Logistic Regression
     fig_lr = create_classification_report(
@@ -263,10 +253,20 @@ def classification_report_image(y_train,
         y_test_preds_lr,
         'Logisti Regression'
     )
-    fig_lr.savefig(out_path_lr)
+    fig_lr.savefig(os.path.join(out_dir, 'classification_report_lr.png'))
+
+    # create classification report for Random Forest
+    fig_rf = create_classification_report(
+        y_train,
+        y_test,
+        y_train_preds_rf,
+        y_test_preds_rf,
+        'Random Forest'
+    )
+    fig_rf.savefig(os.path.join(out_dir, 'classification_report_rf.png'))
 
 
-def feature_importance_plot(model, X_data, output_pth):
+def feature_importance_plot(model, x_data, output_dir):
     '''
     creates and stores the feature importances in pth
     input:
@@ -279,30 +279,25 @@ def feature_importance_plot(model, X_data, output_pth):
     '''
     importances = model.feature_importances_
     indices = np.argsort(importances)[::-1]
-    names = [X_data.columns[i] for i in indices]
+    names = [x_data.columns[i] for i in indices]
 
     plt.figure(figsize=(20, 5))
     plt.title('Feature Importance')
     plt.ylabel('Importance')
 
     # feature importance bar plot
-    plt.bar(range(X_data.shape[1]), importances[indices])
-    plt.xticks(range(X_data.shape[1]), names, rotation=90)
-    plt.savefig(output_pth)
+    plt.bar(range(x_data.shape[1]), importances[indices])
+    plt.xticks(range(x_data.shape[1]), names, rotation=90)
+    plt.savefig(os.path.join(output_dir, 'feature_importances_rf.png'))
 
 
-def train_models(X_train,
-                 X_test,
+def train_models(x_train,
+                 x_test,
                  y_train,
                  y_test,
                  param_grid,
-                 classification_report_path_rf,
-                 classification_report_path_lr,
-                 importance_path_rf,
-                 roc_path,
-                 model_path_lr,
-                 model_path_rf
-
+                 out_plot_dir,
+                 out_model_dir,
                  ):
     '''
     train, store model results: images + scores, and store models
@@ -314,25 +309,23 @@ def train_models(X_train,
     output:
               None
     '''
-    rfc = RandomForestClassifier(random_state=42)
     lrc = LogisticRegression(solver='lbfgs', max_iter=3000)
 
-    # parameters for grid search
-
     cv_rfc = GridSearchCV(
-        estimator=rfc,
-        param_grid=param_grid,
+        estimator = RandomForestClassifier(random_state=42),
+        param_grid = param_grid,
         cv=5
     )
+
     # build models
-    cv_rfc.fit(X_train, y_train)
-    lrc .fit(X_train, y_train)
+    cv_rfc.fit(x_train, y_train)
+    lrc.fit(x_train, y_train)
 
-    y_train_preds_rf = cv_rfc.best_estimator_.predict(X_train)
-    y_test_preds_rf = cv_rfc.best_estimator_.predict(X_test)
+    y_train_preds_rf = cv_rfc.best_estimator_.predict(x_train)
+    y_test_preds_rf = cv_rfc.best_estimator_.predict(x_test)
 
-    y_train_preds_lr = lrc.predict(X_train)
-    y_test_preds_lr = lrc.predict(X_test)
+    y_train_preds_lr = lrc.predict(x_train)
+    y_test_preds_lr = lrc.predict(x_test)
 
     # create and save classification reports
     classification_report_image(
@@ -342,63 +335,61 @@ def train_models(X_train,
         y_train_preds_rf,
         y_test_preds_lr,
         y_test_preds_rf,
-        classification_report_path_lr,
-        classification_report_path_rf,
+        out_plot_dir,
     )
 
     feature_importance_plot(
         cv_rfc.best_estimator_,
-        X_test,
-        importance_path_rf
+        x_test,
+        out_plot_dir,
     )
 
     # ROC curve of logistic regression
-    lrc_plot = plot_roc_curve(lrc, X_test, y_test)
+    lrc_plot = plot_roc_curve(lrc, x_test, y_test)
     # convine ROC curves of both logistic and random forest
     plt.figure(figsize=(15, 8))
-    ax = plt.gca()
-    rfc_disp = plot_roc_curve(
+    ax_roc = plt.gca()
+    plot_roc_curve(
         cv_rfc.best_estimator_,
-        X_test,
+        x_test,
         y_test,
-        ax=ax,
+        ax=ax_roc,
         alpha=0.8)
-    lrc_plot.plot(ax=ax, alpha=0.8)
-    plt.savefig(roc_path)
+    lrc_plot.plot(ax=ax_roc, alpha=0.8)
+    plt.savefig(os.path.join(out_plot_dir, 'roc_curve.png'))
+    #del rfc_disp
 
     # save models
-    joblib.dump(lrc, model_path_lr)
-    joblib.dump(cv_rfc.best_estimator_, model_path_rf)
+    joblib.dump(
+        lrc,
+        os.path.join(out_model_dir, 'logistic_model.pkl')
+    )
+    joblib.dump(
+        cv_rfc.best_estimator_,
+        os.path.join(out_model_dir, 'rfc_model.pkl')
+    )
 
 
 if __name__ == '__main__':
     df = import_data('./data/bank_data.csv')
     perform_eda(
         df,
-        './images/histograms.png',
-        './images/value_counts.png',
-        './images/correlations.png'
+        './images',
     )
-    X_train, X_test, y_train, y_test = perform_feature_engineering(
-        df,
-        'Churn'
-    )
-    param_grid = {
+    X_train_churn, X_test_churn, y_train_churn, y_test_churn = perform_feature_engineering(
+        df, 'Churn')
+    param_grid_churn = {
         'n_estimators': [200, 500],
         'max_features': ['sqrt'],
         'max_depth': [4, 5, 100],
         'criterion': ['gini', 'entropy']
     }
     train_models(
-        X_train,
-        X_test,
-        y_train,
-        y_test,
-        param_grid,
-        './images/classification_report_lr.png',
-        './images/classification_report_rf.png',
-        './images/feature_importance_rf.png',
-        './images/roc_curve.png',
-        './models/logistic_model.pkl',
-        './models/rfc_model.pkl'
+        X_train_churn,
+        X_test_churn,
+        y_train_churn,
+        y_test_churn,
+        param_grid_churn,
+        './images',
+        './models'
     )

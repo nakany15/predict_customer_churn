@@ -65,9 +65,7 @@ class TestPerformEda(object):
 
 		cls.perform_eda(
 			df,
-			histograms_path,
-			value_counts_path,
-			correlation_path
+			tmpdir
 		)
 		try:
 			assert os.path.isfile(histograms_path)
@@ -139,13 +137,22 @@ class TestTrainModels(object):
 	'''
 	test train_models
 	'''
-	def test_outputs_exists(self, tmpdir):
+	@pytest.fixture
+	def param_grid_fixt(self):
+		params=	{
+			'n_estimators': [10, 20],
+			'max_features': ['sqrt'],
+			'max_depth' : [4,5],
+			'criterion' :['gini']
+			}
+		return params
+	def test_outputs_exists(self, tmpdir, param_grid_fixt):
 
 		temp_folder = tempfile.TemporaryDirectory()
 
 		classification_report_path_rf = tmpdir.join('classification_report_lr.png')
 		classification_report_path_lr = tmpdir.join('classification_report_rf.png')
-		importance_path_rf = tmpdir.join('feature_importance_rf.png')
+		importance_path_rf = tmpdir.join('feature_importances_rf.png')
 		roc_path = tmpdir.join('roc_curve.png')
 		model_path_lr = os.path.join(temp_folder.name, 'logistic_model.pkl')
 		model_path_rf = os.path.join(temp_folder.name,'rfc_model.pkl')
@@ -154,24 +161,15 @@ class TestTrainModels(object):
 		X_test = pytest.X_test
 		y_train = pytest.y_train
 		y_test = pytest.y_test
-		param_grid = {
-			'n_estimators': [10, 20],
-			'max_features': ['sqrt'],
-			'max_depth' : [4,5],
-			'criterion' :['gini']
-			}
+
 		cls.train_models(
 			X_train, 
 			X_test, 
 			y_train, 
 			y_test,
-			param_grid,
-			classification_report_path_rf,
-			classification_report_path_lr,
-			importance_path_rf,
-			roc_path,
-			model_path_lr,
-			model_path_rf
+			param_grid_fixt,
+			tmpdir,
+			temp_folder.name
 		)
 		try:
 			assert os.path.isfile(classification_report_path_rf)
