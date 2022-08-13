@@ -21,6 +21,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import yaml
 sns.set()
 
 
@@ -123,7 +124,11 @@ def encoder_helper(df_train, category_lst, response):
     return df_train
 
 
-def perform_feature_engineering(df_train, response):
+def perform_feature_engineering(df_train, 
+                                categories_to_encode, 
+                                other_cols_to_keep,
+                                response
+                                ):
     '''
     input:
               df: pandas dataframe
@@ -136,25 +141,11 @@ def perform_feature_engineering(df_train, response):
               y_train: y training data
               y_test: y testing data
     '''
-    categorical_list = [
-        'Gender',
-        'Education_Level',
-        'Marital_Status',
-        'Income_Category',
-        'Card_Category'
-    ]
+
     # create target variable that takes 1 if customer churn occures
     # perform target encoding
-    df_train = encoder_helper(df_train, categorical_list, response)
-    keep_cols = [
-        'Customer_Age', 'Dependent_count', 'Months_on_book',
-        'Total_Relationship_Count', 'Months_Inactive_12_mon',
-        'Contacts_Count_12_mon', 'Credit_Limit', 'Total_Revolving_Bal',
-        'Avg_Open_To_Buy', 'Total_Amt_Chng_Q4_Q1', 'Total_Trans_Amt',
-        'Total_Trans_Ct', 'Total_Ct_Chng_Q4_Q1', 'Avg_Utilization_Ratio',
-        'Gender_Churn', 'Education_Level_Churn', 'Marital_Status_Churn',
-        'Income_Category_Churn', 'Card_Category_Churn'
-    ]
+    df_train = encoder_helper(df_train, categories_to_encode, response)
+    keep_cols = other_cols_to_keep + [f'{col}_Churn' for col in categories_to_encode]
     y_train_test = df_train[response]
     x_train_test = df_train[keep_cols]
     x_train, x_test, y_train, y_test = train_test_split(
@@ -371,25 +362,30 @@ def train_models(x_train,
 
 
 if __name__ == '__main__':
+    # load parameters from parameters.yml
+    with open('./parameters.yml') as f:
+        parameters = yaml.safe_load(f.read())
+    
     df = import_data('./data/bank_data.csv')
+
     perform_eda(
         df,
         './images',
     )
+
     X_train_churn, X_test_churn, y_train_churn, y_test_churn = perform_feature_engineering(
-        df, 'Churn')
-    param_grid_churn = {
-        'n_estimators': [200, 500],
-        'max_features': ['sqrt'],
-        'max_depth': [4, 5, 100],
-        'criterion': ['gini', 'entropy']
-    }
+        df, 
+        parameters['categories_to_encode'],
+        parameters['other_cols_to_keep'],
+        'Churn'
+    )
+
     train_models(
         X_train_churn,
         X_test_churn,
         y_train_churn,
         y_test_churn,
-        param_grid_churn,
+        parameters['grid_search_params'],
         './images',
         './models'
     )
