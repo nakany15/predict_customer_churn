@@ -7,12 +7,9 @@ import tempfile
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
 import pandas as pd
+import matplotlib
 
-logging.basicConfig(
-    filename='./logs/churn_library.log',
-    level=logging.INFO,
-    filemode='w',
-    format='%(name)s - %(levelname)s - %(message)s')
+LOGGER = logging.getLogger(__name__)
 
 
 def df_plugin():
@@ -28,51 +25,108 @@ def path():
     return "./data/bank_data.csv"
 
 
+@pytest.fixture
+def csv_path(tmpdir):
+    raw_data_file_path = tmpdir.join("raw.csv")
+    input_df = pd.DataFrame.from_dict(
+        {
+            'Attrition_Flag': [
+                'Attrited Customer',
+                'Attrited Customer',
+                'Existing Customer',
+                'Existing Customer',
+            ],
+            'Customer_Age': [
+                58,
+                55,
+                55,
+                42,
+            ],
+            'Gender': [
+                'M',
+                'F',
+                'F',
+                'M'],
+            'Education_Level': [
+                'Graduate',
+                'College',
+                'Graduate',
+                'High School']})
+    input_df.to_csv(raw_data_file_path)
+    return raw_data_file_path
+
+
 class TestImportData(object):
     def test_file_exist(self, path):
         try:
             pytest.df = cls.import_data(path)
-            logging.info("Testing import_data: SUCCESS")
+            LOGGER.info("Testing test_file_exist: SUCCESS")
         except FileNotFoundError as err:
-            logging.error("Testing import_eda: The file wasn't found")
+            LOGGER.error("Testing test_file_exist: The file wasn't found")
+            pytest.df = pd.DataFrame()
             raise err
 
-    def test_record_greater_than_zero(self):
+    def test_data_shape(self, csv_path):
         '''
         test data import - this example is completed for you to assist with the other test functions
         '''
-        df = pytest.df
+        df = cls.import_data(csv_path)
         try:
-            assert df.shape[0] > 0
-            assert df.shape[1] > 0
+            assert df.shape == [4, 4]
         except AssertionError as err:
-            logging.error(
-                "Testing import_data: The file doesn't appear to have rows and columns")
-            raise err
+            LOGGER.error(
+                'test_data_shape: the imported data shape differs from csv')
 
-    def test_target_exists(self):
-        df = pytest.df
+
+    def test_target_exists(self, csv_path):
+        df = cls.import_data(csv_path)
         try:
             assert 'Churn' in df.columns
         except AssertionError as err:
-            logging.error(
-                "test_eda columns check: the DataFrame doesn't contain a target variable")
+            LOGGER.error(
+                "test_target_exists columns check: the DataFrame doesn't contain a target variable")
             raise err
 
 
-class TestPerformEda(object):
 
-    def test_eda_output(self, tmpdir):
+class TestPerformEda(object):
+    @pytest.fixture
+    def input_df_fixt(self):
+        input_df = pd.DataFrame.from_dict(
+            {
+                'Churn': [
+                    1,
+                    0,
+                    0,
+                    1,
+                ],
+                'Customer_Age': [
+                    58,
+                    55,
+                    55,
+                    42,
+                ],
+                'Gender': [
+                    'M',
+                    'F',
+                    'F',
+                    'M'],
+                'Education_Level': [
+                    'Graduate',
+                    'College',
+                    'Graduate',
+                    'High School']})
+        return input_df
+    def test_eda_output(self, input_df_fixt, tmpdir):
         '''
         test perform eda function
         '''
-        df = pytest.df
         histograms_path = tmpdir.join('histograms.png')
         value_counts_path = tmpdir.join('value_counts.png')
         correlation_path = tmpdir.join('correlations.png')
 
         cls.perform_eda(
-            df,
+            input_df_fixt,
             tmpdir
         )
         try:
@@ -80,53 +134,107 @@ class TestPerformEda(object):
             assert os.path.isfile(value_counts_path)
             assert os.path.isfile(correlation_path)
         except AssertionError as err:
-            logging.error(
+            LOGGER.error(
                 "perform_eda function didn't produce expected image outputs")
             raise err
 
 
 class TestEncoderHelper(object):
     @pytest.fixture
-    def encoder_fixt(self):
-        df = pytest.df
-        df_out = cls.encoder_helper(
-            df, ['Income_Category', 'Education_Level'], 'Churn')
-        return df_out
+    def input_df_fixt(self):
+        input_df = pd.DataFrame.from_dict(
+            {
+                'Churn': [
+                    1,
+                    0,
+                    0,
+                    1,
+                ],
+                'Customer_Age': [
+                    58,
+                    55,
+                    55,
+                    42,
+                ],
+                'Gender': [
+                    'M',
+                    'M',
+                    'F',
+                    'F'],
+                'Education_Level': [
+                    'Graduate',
+                    'College',
+                    'Graduate',
+                    'High School']})
+        return input_df
 
-    def test_column_created(self, encoder_fixt):
+    def test_column_created(self, input_df_fixt):
+        encoded_df = cls.encoder_helper(input_df_fixt,['Gender', 'Education_Level'], 'Churn')
         try:
-            assert 'Income_Category_Churn' in encoder_fixt.columns
-            assert 'Education_Level_Churn' in encoder_fixt.columns
+            assert 'Gender_Churn' in encoded_df.columns
+            assert 'Education_Level_Churn' in encoded_df.columns
         except AssertionError as err:
-            logging.error("encoder_helper function didn't create Gender_Churn")
+            LOGGER.error("encoder_helper function didn't create Gender_Churn")
             raise err
 
-    def test_dataframe_shape(self, encoder_fixt):
+    def test_dataframe_shape(self, input_df_fixt):
         '''
-        test encoder helper
+        test encoder helper        
         '''
-        df = pytest.df
+        encoded_df = cls.encoder_helper(input_df_fixt,['Gender', 'Education_Level'], 'Churn')
         try:
-            assert encoder_fixt.shape[0] == df.shape[0]
-            assert encoder_fixt.shape[1] == df.shape[1] + 2
+            assert encoded_df.shape[0] == input_df_fixt.shape[0]
+            assert encoded_df.shape[1] == input_df_fixt.shape[1] + 2
         except AssertionError as err:
-            logging.error(
+            LOGGER.error(
                 "encoder_helper didn't produced expected output shape")
             raise err
 
-    def test_value_counts(self, encoder_fixt):
+    def test_education_encoded_values(self, input_df_fixt):
+        encoded_df = cls.encoder_helper(input_df_fixt,['Gender', 'Education_Level'], 'Churn')
         try:
-            assert len(
-                encoder_fixt['Income_Category_Churn'].value_counts()) == len(
-                encoder_fixt['Income_Category'].value_counts())
-            assert len(
-                encoder_fixt['Education_Level_Churn'].value_counts()) == len(
-                encoder_fixt['Education_Level'].value_counts())
+            assert encoded_df.loc[encoded_df['Education_Level']=='Graduate', 'Education_Level_Churn'].mean() == pytest.approx(0.5)
+            assert encoded_df.loc[encoded_df['Education_Level']=='College', 'Education_Level_Churn'].mean() == pytest.approx(0)
+            assert encoded_df.loc[encoded_df['Education_Level']=='High School', 'Education_Level_Churn'].mean() == pytest.approx(1)
+
         except AssertionError as err:
-            logging.error(
-                "number of unique values in encoded variables must be equel to original variables")
+            LOGGER.error(
+                "encoder_helper produced unexpected values of Education_Level_Churn")
             raise err
 
+    def test_gender_encoded_values(self, input_df_fixt):
+        encoded_df = cls.encoder_helper(input_df_fixt,['Gender', 'Education_Level'], 'Churn')
+        try:
+            assert encoded_df.loc[encoded_df['Gender']=='M', 'Gender_Churn'].unique() == pytest.approx(0.5)
+            assert encoded_df.loc[encoded_df['Gender']=='F', 'Gender_Churn'].unique() == pytest.approx(0.5)
+        except AssertionError as err:
+            LOGGER.error(
+                "the value of Gender_Churn must be 0.5 when Gender == 'M'")
+            raise err
+
+    def test_value_counts(self, input_df_fixt):
+        encoded_df = cls.encoder_helper(input_df_fixt,['Gender', 'Education_Level'], 'Churn')
+
+        try:
+            assert len(
+                encoded_df['Gender_Churn'].value_counts()) == 1
+            assert len(
+                encoded_df['Education_Level_Churn'].value_counts()) == len(
+                encoded_df['Education_Level'].value_counts())
+        except AssertionError as err:
+            LOGGER.error(
+                "number of unique values in encoded variables must be equel to original variables")
+            raise err
+    
+    def test_no_encode(self, input_df_fixt):
+        encoded_df = cls.encoder_helper(input_df_fixt,[], 'Churn')
+        try:
+            assert input_df_fixt.shape == encoded_df.shape
+            assert set(input_df_fixt.columns) == set(encoded_df.columns)
+        except AssertionError as err:
+            LOGGER.error(
+                "encoder_helper modified the shape of input DataFrame. that is invalid")
+            raise err
 
 class TestperformFeatureEngineering(object):
     '''
@@ -134,10 +242,7 @@ class TestperformFeatureEngineering(object):
     '''
     @pytest.fixture(params=[['Gender'],
                             ['Education_Level',
-                             'Marital_Status'],
-                            ['Income_Category',
-                             'Card_Category',
-                             'Education_Level']])
+                             'Marital_Status']])
     def encoding_category_fixt(self, request):
         X_train, X_test, y_train, y_test = cls.perform_feature_engineering(
             pytest.df,
@@ -151,49 +256,109 @@ class TestperformFeatureEngineering(object):
         )
         return [X_train, X_test, y_train, y_test, len(request.param)]
 
-    def test_column_length(self, encoding_category_fixt):
+    def test_column_length(self, mocker):
+        mocker.patch(
+            "src.churn_library.encoder_helper", 
+            return_value=pd.DataFrame.from_dict(
+            {
+                'Churn': [
+                    1,
+                    0,
+                    0,
+                    1,
+                ],
+                'Customer_Age': [
+                    58,
+                    55,
+                    55,
+                    42,
+                ],
+                'Gender': [
+                    'M',
+                    'M',
+                    'F',
+                    'F'],
+                'Gender_Churn': [
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5],
+            })
+        )
         df = pytest.df
-        X_train, X_test, y_train, y_test, cat_len = encoding_category_fixt
+        X_train, X_test, y_train, y_test = cls.perform_feature_engineering(
+            pytest.df,
+            ['Gender'],
+            ['Customer_Age'],
+            'Churn'
+        )
         try:
-            assert X_train.shape[1] == 3 + cat_len
-            assert X_test.shape[1] == 3 + cat_len
+            assert X_train.shape[1] == 2
+            assert X_test.shape[1] == 2
 
         except AssertionError as err:
-            logging.error(
+            LOGGER.error(
                 "encoder_helper didn't produced expected number of columns")
             raise err
 
-    def test_output_shapes(self, encoding_category_fixt):
-
-        df = pytest.df
-        X_train, X_test, y_train, y_test, cat_len = encoding_category_fixt
+    def test_output_shapes(self, mocker):
+        mocker.patch(
+            "src.churn_library.encoder_helper", 
+            return_value=pd.DataFrame.from_dict(
+            {
+                'Churn': [
+                    1,
+                    0,
+                    0,
+                    1,
+                    0,
+                    1,
+                    1,
+                    0,
+                    1,
+                    1,
+                ],
+                'Customer_Age': [
+                    58,
+                    55,
+                    55,
+                    42,
+                    53,
+                    58,
+                    55,
+                    55,
+                    42,
+                    53,
+                ],
+            })
+        )
+        X_train, X_test, y_train, y_test = cls.perform_feature_engineering(
+            pytest.df,
+            [],
+            ['Customer_Age'],
+            'Churn'
+        )
         try:
-            assert X_train.shape[1] == 3 + cat_len
-            assert X_test.shape[1] == 3 + cat_len
             assert X_train.shape[0] == len(y_train)
             assert X_test.shape[0] == len(y_test)
-            assert X_train.shape[0] / \
-                df.shape[0] == pytest.approx(0.7, rel=1e-3)
-            assert X_test.shape[0] / \
-                df.shape[0] == pytest.approx(0.3, rel=1e-3)
-
+            assert X_train.shape[0]  == 7
+            assert X_test.shape[0] == 3
         except AssertionError as err:
-            logging.error(
+            LOGGER.error(
                 "encoder_helper didn't produced expected output shape")
             raise err
 
-    def test_record_not_changes(self, encoding_category_fixt):
-        df = pytest.df
-        X_train, X_test, y_train, y_test, cat_len = encoding_category_fixt
-        try:
-            assert len(X_train) + len(X_test) == len(df)
-            assert len(y_train) + len(y_test) == len(df)
-        except AssertionError as err:
-            logging.error(
-                "total number of train and test must be equal to input DataFrame")
-            raise err
-
-
+class TestCreateClassificationReport(object):
+    def test_create_classification_report(self, mocker):
+        fig = cls.create_classification_report(
+            [1,0,0,1],
+            [1,1,0,0],
+            [1,0,0,1],
+            [1,0,1,1],
+            'Logistic Regression'
+        )
+        assert isinstance(fig, matplotlib.figure.Figure)
+        
 class TestTrainModels(object):
     '''
     test train_models
@@ -258,7 +423,7 @@ class TestTrainModels(object):
             assert os.path.isfile(model_path_lr)
             assert os.path.isfile(model_path_rf)
         except AssertionError as err:
-            logging.error("test_train_models didn't produce expected outputs")
+            LOGGER.error("test_train_models didn't produce expected outputs")
             raise err
         # tear down
         temp_folder.cleanup()

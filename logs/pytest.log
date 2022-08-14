@@ -1,0 +1,2 @@
+2022-08-14 19:00:25 [    INFO] Testing test_file_exist: SUCCESS (test_churn_script_logging.py:63)
+2022-08-14 19:00:25 [   ERROR] test_data_shape: the imported data shape differs from csv (test_churn_script_logging.py:77)

@@ -358,15 +358,25 @@ def train_models(
     y_test_preds_lr = lrc.predict(x_test)
 
     # create and save classification reports
-    classification_report_image(
+
+    fig = create_classification_report(
         y_train,
         y_test,
         y_train_preds_lr,
-        y_train_preds_rf,
         y_test_preds_lr,
-        y_test_preds_rf,
-        out_plot_dir,
+        'Logistic Regression'
     )
+
+    fig.savefig(os.path.join(out_plot_dir, 'classification_report_lr.png'))
+
+    fig = create_classification_report(
+        y_train,
+        y_test,
+        y_train_preds_rf,
+        y_test_preds_rf,
+        'Random Forest'
+    )
+    fig.savefig(os.path.join(out_plot_dir, 'classification_report_rf.png'))
 
     feature_importance_plot(
         cv_rfc.best_estimator_,
