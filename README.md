@@ -4,7 +4,12 @@
 
 ## Project Description
 This project is developed to predict customer churn using bank data. 
-
+In the bank industry, the customer churn has been increasingly critical for their bussiness.
+In order to keep their customer, predict customers with high risk of churn and
+investigate their characteristics are crucial.
+In this project, machine learning models to predict the risk of churn for
+each customer are built. Also, feature importance plot is provided to
+make sure features that affect the risk of the customer churn.
 
 
 ## Files and data description
