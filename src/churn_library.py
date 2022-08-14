@@ -7,6 +7,8 @@ Models are created by following steps.
 3. feature engineering
 4. build machine learning model using Logistic Regression and Random Forest.
 5. evaluate model performances and save models.
+Author: Yusuke Nakano
+Date: 2022/8/10
 """
 
 # import libraries
@@ -43,7 +45,7 @@ def import_data(pth: str) -> pd.DataFrame:
     df_train = pd.read_csv(pth)
     df_train['Churn'] = df_train['Attrition_Flag'].apply(
         lambda val: 0 if val == "Existing Customer" else 1)
-    df_train.drop(columns=['Attrition_Flag'])
+    df_train = df_train.drop(columns='Attrition_Flag')
     return df_train
 
 
@@ -235,53 +237,6 @@ def create_classification_report(
 
     plt.axis('off')
     return fig
-
-
-def classification_report_image(
-    y_train: Union[pd.Series, np.array],
-    y_test: Union[pd.Series, np.array],
-    y_train_preds_lr: Union[pd.Series, np.array],
-    y_train_preds_rf: Union[pd.Series, np.array],
-    y_test_preds_lr: Union[pd.Series, np.array],
-    y_test_preds_rf: Union[pd.Series, np.array],
-    out_dir: str,
-) -> None:
-    '''
-    produces classification report for training and testing results and stores report as image
-    in images folder
-    input:
-            y_train: training response values
-            y_test:  test response values
-            y_train_preds_lr: training predictions from logistic regression
-            y_train_preds_rf: training predictions from random forest
-            y_test_preds_lr: test predictions from logistic regression
-            y_test_preds_rf: test predictions from random forest
-            out_dir: output directory path to save classification report
-
-    output:
-             None
-    '''
-
-    # create classification report for Logistic Regression
-    fig_lr = create_classification_report(
-        y_train,
-        y_test,
-        y_train_preds_lr,
-        y_test_preds_lr,
-        'Logisti Regression'
-    )
-    fig_lr.savefig(os.path.join(out_dir, 'classification_report_lr.png'))
-
-    # create classification report for Random Forest
-    fig_rf = create_classification_report(
-        y_train,
-        y_test,
-        y_train_preds_rf,
-        y_test_preds_rf,
-        'Random Forest'
-    )
-    fig_rf.savefig(os.path.join(out_dir, 'classification_report_rf.png'))
-
 
 def feature_importance_plot(
         model: ClassifierMixin,
